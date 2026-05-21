@@ -1,0 +1,33 @@
+@import "mapbox-gl/dist/mapbox-gl.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 222 54% 6%;
+    --foreground: 210 40% 98%;
+
+    --card: 220 41% 10%;
+    --card-foreground: 210 40% 98%;
+
+    --muted: 220 15% 30%;
+    --muted-foreground: 215 16% 55%;
+
+    --border: 217 33% 17%;
+
+    --input: 217 33% 17%;
+
+    --ring: 156 71% 40%;
+    --radius: 0.75rem;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply min-h-screen bg-[#0A0F1E] font-sans text-[#F9FAFB] antialiased;
+  }
+}
