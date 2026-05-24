@@ -47,11 +47,16 @@ module.exports = {
           "0%, 100%": { transform: "scale(1)" },
           "50%": { transform: "scale(1.04)" },
         },
+        radarRing: {
+          "0%": { transform: "scale(0.65)", opacity: "0.85" },
+          "100%": { transform: "scale(1.35)", opacity: "0" },
+        },
       },
       animation: {
         pulseMarker: "pulseMarker 1.75s ease-in-out infinite",
         slideIn: "slideIn 0.35s ease-out",
         "truck-drive": "truckDrive 0.8s ease-in-out infinite",
+        "radar-ring": "radarRing 1.6s ease-out infinite",
       },
     },
   },

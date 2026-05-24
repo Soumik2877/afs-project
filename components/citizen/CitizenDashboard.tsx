@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 
 import Link from "next/link";
 
+import { CitizenPickupPanel } from "@/components/citizen/CitizenPickupPanel";
 import { MapErrorBoundary } from "@/components/maps/MapErrorBoundary";
 import { Button } from "@/components/ui/button";
 import type { ActiveRouteTracking } from "@/lib/routes/active-route";
@@ -18,9 +19,10 @@ const CitizenTrackMap = dynamic(() => import("@/components/maps/CitizenTrackMap"
 interface CitizenHomeProps {
   tracking: ActiveRouteTracking | null;
   localityLabel?: string | null;
+  citizenId?: string | null;
 }
 
-export function CitizenDashboard({ tracking, localityLabel }: CitizenHomeProps) {
+export function CitizenDashboard({ tracking, localityLabel, citizenId }: CitizenHomeProps) {
   const etaMinutes = tracking?.driverLocation ? 12 : undefined;
 
   return (
@@ -34,9 +36,21 @@ export function CitizenDashboard({ tracking, localityLabel }: CitizenHomeProps) 
             {tracking.driverName ? ` · ${tracking.driverName}` : ""}
           </p>
         ) : null}
-        <Button variant="outline" className="mt-8 px-12 py-6 text-lg uppercase tracking-[0.45em]" type="button" asChild>
-          <Link href="/citizen/report">Report anomaly</Link>
-        </Button>
+        <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-start">
+          {tracking && citizenId ? (
+            <div className="flex-1">
+              <CitizenPickupPanel
+                citizenId={citizenId}
+                routeId={tracking.route.id}
+                driverId={tracking.route.assigned_driver_id!}
+                initialDriverLocation={tracking.driverLocation}
+              />
+            </div>
+          ) : null}
+          <Button variant="outline" className="px-12 py-6 text-lg uppercase tracking-[0.45em]" type="button" asChild>
+            <Link href="/citizen/report">Report anomaly</Link>
+          </Button>
+        </div>
       </section>
 
       {tracking ? (
@@ -49,6 +63,7 @@ export function CitizenDashboard({ tracking, localityLabel }: CitizenHomeProps) 
             driverName={tracking.driverName}
             driverLocation={tracking.driverLocation}
             collectedBinIds={tracking.collectedBinIds}
+            citizenId={citizenId ?? undefined}
           />
         </MapErrorBoundary>
       ) : (
@@ -57,12 +72,17 @@ export function CitizenDashboard({ tracking, localityLabel }: CitizenHomeProps) 
 
       <div className="rounded-[28px] border border-[#1F2937] bg-[#0f172d] px-6 py-5 text-sm">
         Servicing routes for your locality.
-        <p className="mt-2 font-mono text-base text-emerald-200">{localityLabel ?? "Koramangala"}</p>
+        <p className="mt-2 font-mono text-base text-emerald-200">{localityLabel ?? "Kalaikunda"}</p>
         {!tracking ? (
           <p className="mt-2 text-xs text-[#64748B]">
-            No active route today — admin must set route status to active with today&apos;s date.
+            No active collection route — run <span className="font-mono">npm run seed:demo-route</span> and{" "}
+            <span className="font-mono">npm run simulate:all</span>.
           </p>
-        ) : null}
+        ) : (
+          <p className="mt-2 text-xs text-[#64748B]">
+            Live loop · bins update automatically during simulation.
+          </p>
+        )}
       </div>
     </div>
   );

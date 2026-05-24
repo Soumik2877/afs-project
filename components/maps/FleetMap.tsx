@@ -4,7 +4,8 @@ import { useMemo } from "react";
 import Map, { Marker, NavigationControl } from "react-map-gl";
 
 import { cn } from "@/lib/utils";
-import { MAP_STYLE } from "@/lib/mapbox/config";
+import { MAP_3D_VIEW, MAP_STYLE, withMap3DView } from "@/lib/mapbox/config";
+import { Map3DSetup } from "@/components/maps/Map3DSetup";
 import type { DriverLocationRow, UserRow } from "@/types";
 
 const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
@@ -21,13 +22,17 @@ interface FleetMapProps {
 export default function FleetMap({ drivers, heightClass = "h-[calc(100vh-140px)]" }: FleetMapProps) {
   const view = useMemo(() => {
     if (!drivers.length) {
-      return { latitude: 12.9716, longitude: 77.5946, zoom: 11 };
+      return withMap3DView({
+        latitude: Number(process.env.NEXT_PUBLIC_DEMO_ROUTE_CENTER_LAT ?? 22.333298),
+        longitude: Number(process.env.NEXT_PUBLIC_DEMO_ROUTE_CENTER_LNG ?? 87.222896),
+        zoom: 14,
+      });
     }
 
     const lat = drivers.reduce((sum, d) => sum + d.latitude, 0) / drivers.length || drivers[0]!.latitude;
     const lng = drivers.reduce((sum, d) => sum + d.longitude, 0) / drivers.length || drivers[0]!.longitude;
 
-    return { latitude: lat, longitude: lng, zoom: 12 };
+    return withMap3DView({ latitude: lat, longitude: lng, zoom: MAP_3D_VIEW.zoom });
   }, [drivers]);
 
   if (!token) {
@@ -46,7 +51,8 @@ export default function FleetMap({ drivers, heightClass = "h-[calc(100vh-140px)]
   return (
     <div className={cn("overflow-hidden rounded-xl border border-[#1F2937]", heightClass)}>
       <Map initialViewState={view} mapStyle={MAP_STYLE} mapboxAccessToken={token} style={{ width: "100%", height: "100%" }}>
-        <NavigationControl position="top-right" />
+        <NavigationControl position="top-right" visualizePitch />
+        <Map3DSetup />
         {drivers.map((driverLocation) => {
           const hue = driverLocation.meta?.anomaly ? "#EF4444" : driverLocation.meta?.status === "idle" ? "#9CA3AF" : "#10B981";
 

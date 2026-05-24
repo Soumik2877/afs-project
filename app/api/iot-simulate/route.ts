@@ -8,7 +8,12 @@ import {
   shouldIncludeBin,
   type BinTelemetryRow,
 } from "@/lib/iot/simulator";
+import { getDemoBinLabelPrefix } from "@/lib/demo/rectangle-route";
 import { createServiceRoleClient } from "@/lib/supabase/service";
+
+function demoSimulationBinsOnly() {
+  return process.env.DEMO_SIMULATION_BINS_ONLY === "true";
+}
 
 function authorize(request: Request) {
   const header = request.headers.get("authorization");
@@ -43,7 +48,11 @@ async function runSimulation(request: Request) {
   const supabase = createServiceRoleClient();
   const rng = createSimulationRng(getIotSimulationSeed());
 
-  const { data: bins, error } = await supabase.from("bins").select("id, fill_level, status");
+  const binSelect = demoSimulationBinsOnly()
+    ? supabase.from("bins").select("id, label, fill_level, status").like("label", `${getDemoBinLabelPrefix()}-%`)
+    : supabase.from("bins").select("id, fill_level, status");
+
+  const { data: bins, error } = await binSelect;
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });

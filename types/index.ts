@@ -16,6 +16,8 @@ export type FacilityWasteType = "general" | "organic" | "recyclable";
 
 export type BatchStatus = "decomposing" | "ready" | "utilized";
 
+export type CitizenPickupStatus = "pending" | "en_route" | "arrived" | "completed" | "cancelled";
+
 export interface UserRow {
   id: string;
   full_name: string | null;
@@ -142,4 +144,16 @@ export interface RouteWithDriver extends RouteRow {
 
 export interface ComplaintWithUser extends ComplaintRow {
   reporter?: Pick<UserRow, "full_name" | "phone"> | null;
+}
+
+export interface CitizenPickupRequestRow {
+  id: string;
+  citizen_id: string;
+  route_id: string;
+  latitude: number;
+  longitude: number;
+  status: CitizenPickupStatus;
+  created_at: string;
+  arrived_at: string | null;
+  completed_at: string | null;
 }

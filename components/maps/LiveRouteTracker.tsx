@@ -14,8 +14,9 @@ interface LiveRouteTrackerProps {
   driverName?: string | null;
   driverLocation: DriverLocationRow | null;
   collectedBinIds: string[];
+  citizenId?: string;
 }
 
-export function LiveRouteTracker(props: LiveRouteTrackerProps) {
-  return <LiveRouteMap {...props} initialDriverLocation={props.driverLocation} />;
+export function LiveRouteTracker({ driverLocation, ...props }: LiveRouteTrackerProps) {
+  return <LiveRouteMap {...props} initialDriverLocation={driverLocation} />;
 }

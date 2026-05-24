@@ -1,6 +1,7 @@
 import { CitizenDashboard } from "@/components/citizen/CitizenDashboard";
-import { createClient } from "@/lib/supabase/server";
+import { getDemoRouteLocality } from "@/lib/simulation/demo-loop";
 import { getActiveRouteForTracking } from "@/lib/routes/active-route";
+import { createClient } from "@/lib/supabase/server";
 
 export default async function CitizenHomePage() {
   const supabase = createClient();
@@ -9,16 +10,13 @@ export default async function CitizenHomePage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data: profile } = await supabase.from("users").select("locality").eq("id", user?.id ?? "").maybeSingle();
-
-  const tracking = await getActiveRouteForTracking(supabase, {
-    locality: profile?.locality ?? "Koramangala",
-  });
+  const tracking = await getActiveRouteForTracking(supabase);
 
   return (
     <CitizenDashboard
       tracking={tracking}
-      localityLabel={profile?.locality ?? "Koramangala"}
+      localityLabel={tracking?.route.name ?? getDemoRouteLocality()}
+      citizenId={user?.id ?? null}
     />
   );
 }

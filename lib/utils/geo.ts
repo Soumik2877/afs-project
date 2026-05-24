@@ -24,3 +24,23 @@ export function haversineMeters(a: { lat: number; lng: number }, b: { lat: numbe
 
   return R * c;
 }
+
+/** Project a point onto a segment; returns interpolation t ∈ [0, 1] and snapped lat/lng. */
+export function projectPointOnSegment(
+  point: { lat: number; lng: number },
+  start: { lat: number; lng: number },
+  end: { lat: number; lng: number },
+) {
+  const dx = end.lng - start.lng;
+  const dy = end.lat - start.lat;
+  const px = point.lng - start.lng;
+  const py = point.lat - start.lat;
+  const len2 = dx * dx + dy * dy;
+  const t = len2 === 0 ? 0 : Math.max(0, Math.min(1, (px * dx + py * dy) / len2));
+
+  return {
+    t,
+    lat: start.lat + t * dy,
+    lng: start.lng + t * dx,
+  };
+}

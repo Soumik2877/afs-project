@@ -1,0 +1,42 @@
+[
+  {
+    "suffix": "-01",
+    "latitude": 22.335974,
+    "longitude": 87.220821,
+    "fillLevel": 35,
+    "status": "filling",
+    "binType": "general"
+  },
+  {
+    "suffix": "-02",
+    "latitude": 22.334092,
+    "longitude": 87.225045,
+    "fillLevel": 52,
+    "status": "filling",
+    "binType": "organic"
+  },
+  {
+    "suffix": "-03",
+    "latitude": 22.334016,
+    "longitude": 87.222901,
+    "fillLevel": 68,
+    "status": "filling",
+    "binType": "recyclable"
+  },
+  {
+    "suffix": "-04",
+    "latitude": 22.331409,
+    "longitude": 87.224041,
+    "fillLevel": 81,
+    "status": "full",
+    "binType": "general"
+  },
+  {
+    "suffix": "-05",
+    "latitude": 22.331001,
+    "longitude": 87.221671,
+    "fillLevel": 44,
+    "status": "filling",
+    "binType": "organic"
+  }
+]

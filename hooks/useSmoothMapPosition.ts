@@ -57,6 +57,9 @@ function segmentDurationMs(
     if (Number.isFinite(parsed) && parsed > 500) return parsed;
   }
 
+  const pollMs = Number(process.env.NEXT_PUBLIC_DRIVER_LOCATION_POLL_MS ?? 3000);
+  if (Number.isFinite(pollMs) && pollMs > 500) return pollMs;
+
   const latDiff = Math.abs(to.latitude - from.latitude);
   const lngDiff = Math.abs(to.longitude - from.longitude);
   const distance = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
@@ -97,10 +100,12 @@ export function useSmoothMapPosition(target: MapCoordinate | null, updatedAt?: s
     const next = { latitude: target.latitude, longitude: target.longitude };
 
     const jumped =
-      Math.abs(prev.latitude - next.latitude) > 0.0001 ||
-      Math.abs(prev.longitude - next.longitude) > 0.0001;
+      Math.abs(prev.latitude - next.latitude) > 0.000001 ||
+      Math.abs(prev.longitude - next.longitude) > 0.000001;
 
-    if (!jumped && displayRef.current) return;
+    const serverTick = updatedAt != null && updatedAt !== lastServerAtRef.current;
+
+    if (!jumped && !serverTick && displayRef.current) return;
 
     const durationMs = segmentDurationMs(
       prev,

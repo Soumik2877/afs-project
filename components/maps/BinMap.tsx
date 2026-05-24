@@ -6,7 +6,8 @@ import Map, { Marker, NavigationControl } from "react-map-gl";
 
 import { cn } from "@/lib/utils";
 
-import { MAP_STYLE } from "@/lib/mapbox/config";
+import { MAP_3D_VIEW, MAP_STYLE, withMap3DView } from "@/lib/mapbox/config";
+import { Map3DSetup } from "@/components/maps/Map3DSetup";
 import type { BinRow } from "@/types";
 
 const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
@@ -32,7 +33,7 @@ export default function BinMap({ bins, onSelectBin, heightClass = "h-[calc(100vh
       bins.reduce((sum, bin) => sum + bin.longitude, 0) /
       bins.length || bins[0]!.longitude;
 
-    return { latitude: averageLat, longitude: averageLng, zoom: 12 };
+    return withMap3DView({ latitude: averageLat, longitude: averageLng, zoom: MAP_3D_VIEW.zoom });
   }, [bins]);
 
   if (!token) {
@@ -56,7 +57,8 @@ export default function BinMap({ bins, onSelectBin, heightClass = "h-[calc(100vh
           }
         }}
       >
-        <NavigationControl position="top-right" />
+        <NavigationControl position="top-right" visualizePitch />
+        <Map3DSetup />
         {bins.map((bin) => {
           const color =
             bin.fill_level >= 80

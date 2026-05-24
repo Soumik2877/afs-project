@@ -9,7 +9,8 @@
     "lint": "next lint",
     "simulate:iot": "node scripts/iot-simulate-loop.mjs",
     "simulate:driver": "node scripts/driver-simulate-loop.mjs",
-    "simulate:all": "node scripts/demo-simulate-loop.mjs"
+    "simulate:all": "node scripts/demo-simulate-loop.mjs",
+    "seed:demo-route": "node scripts/seed-demo-rectangle.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
@@ -47,7 +48,6 @@
     "sonner": "^1.7.4",
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
-    "three": "^0.184.0",
     "twilio": "^5.4.5",
     "zod": "^3.23.8",
     "zustand": "^4.5.5"
@@ -58,7 +58,6 @@
     "@types/papaparse": "^5.3.14",
     "@types/react": "^18",
     "@types/react-dom": "^18",
-    "@types/three": "^0.184.1",
     "eslint": "^8",
     "eslint-config-next": "14.2.35",
     "postcss": "^8",

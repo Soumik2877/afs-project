@@ -4,7 +4,8 @@ import Map, { Marker, NavigationControl } from "react-map-gl";
 
 import type { BinRow } from "@/types";
 
-import { MAP_STYLE } from "@/lib/mapbox/config";
+import { MAP_3D_VIEW, MAP_STYLE, withMap3DView } from "@/lib/mapbox/config";
+import { Map3DSetup } from "@/components/maps/Map3DSetup";
 
 interface RouteMapSnippetProps {
   bins: BinRow[];
@@ -27,16 +28,17 @@ export default function RouteMapSnippet({ bins, focus }: RouteMapSnippetProps) {
   return (
     <div className="h-[240px] overflow-hidden rounded-2xl border border-[#1F2937]">
       <Map
-        initialViewState={{
+        initialViewState={withMap3DView({
           latitude: center.latitude,
           longitude: center.longitude,
-          zoom: 13,
-        }}
+          zoom: MAP_3D_VIEW.zoom,
+        })}
         mapboxAccessToken={token}
         mapStyle={MAP_STYLE}
         style={{ width: "100%", height: "100%" }}
       >
-        <NavigationControl position="top-right" />
+        <NavigationControl position="top-right" visualizePitch />
+        <Map3DSetup />
         {bins.map((bin) => (
           <Marker key={bin.id} latitude={bin.latitude} longitude={bin.longitude}>
             <div

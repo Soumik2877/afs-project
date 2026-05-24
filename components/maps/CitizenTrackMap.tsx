@@ -2,7 +2,8 @@
 
 import Map, { Marker, NavigationControl } from "react-map-gl";
 
-import { MAP_STYLE } from "@/lib/mapbox/config";
+import { MAP_3D_VIEW, MAP_STYLE, withMap3DView } from "@/lib/mapbox/config";
+import { Map3DSetup } from "@/components/maps/Map3DSetup";
 import { cn } from "@/lib/utils";
 import type { DriverLocationRow } from "@/types";
 
@@ -34,9 +35,14 @@ export default function CitizenTrackMap({
     );
   }
 
+  const demoCenter = {
+    latitude: Number(process.env.NEXT_PUBLIC_DEMO_ROUTE_CENTER_LAT ?? 22.333298),
+    longitude: Number(process.env.NEXT_PUBLIC_DEMO_ROUTE_CENTER_LNG ?? 87.222896),
+  };
+
   const focus = citizenLatLng ?? {
-    latitude: driver?.latitude ?? 12.96,
-    longitude: driver?.longitude ?? 77.59,
+    latitude: driver?.latitude ?? demoCenter.latitude,
+    longitude: driver?.longitude ?? demoCenter.longitude,
   };
 
   return (
@@ -51,16 +57,17 @@ export default function CitizenTrackMap({
       ) : null}
       <div className={cn("overflow-hidden rounded-2xl border border-[#1F2937]", heightClass)}>
         <Map
-          initialViewState={{
+          initialViewState={withMap3DView({
             latitude: focus.latitude,
             longitude: focus.longitude,
-            zoom: driver ? 14 : 13,
-          }}
+            zoom: driver ? MAP_3D_VIEW.zoom : MAP_3D_VIEW.zoom - 1,
+          })}
           mapStyle={MAP_STYLE}
           mapboxAccessToken={token}
           style={{ width: "100%", height: "100%" }}
         >
-          <NavigationControl position="bottom-right" />
+          <NavigationControl position="bottom-right" visualizePitch />
+          <Map3DSetup />
           {citizenLatLng ? <Marker latitude={citizenLatLng.latitude} longitude={citizenLatLng.longitude} /> : null}
           {driver ? (
             <Marker latitude={driver.latitude} longitude={driver.longitude} anchor="bottom" />

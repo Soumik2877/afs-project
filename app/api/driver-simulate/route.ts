@@ -6,6 +6,12 @@ import {
   isDriverAnomalyDemoEnabled,
   isDriverSimulationEnabled,
 } from "@/lib/simulation/config";
+import {
+  ensureDemoRouteActive,
+  isDemoLoopRoute,
+  resetDemoRouteLap,
+} from "@/lib/simulation/demo-loop";
+import { simulateCitizenDetourTick } from "@/lib/simulation/citizen-detour";
 import { simulateRouteTick, type RouteBinWaypoint } from "@/lib/simulation/route-collection";
 import { createServiceRoleClient } from "@/lib/supabase/service";
 
@@ -46,9 +52,11 @@ async function runSimulation(request: Request) {
   const stepMeters = getDriverSimulationStepMeters();
   const anomalyDemo = isDriverAnomalyDemoEnabled();
 
+  await ensureDemoRouteActive(supabase);
+
   const { data: routes, error: routesError } = await supabase
     .from("routes")
-    .select("id, assigned_driver_id, bin_ids, status")
+    .select("id, name, assigned_driver_id, bin_ids, status")
     .eq("status", "active");
 
   if (routesError) {
@@ -98,7 +106,13 @@ async function runSimulation(request: Request) {
       .eq("route_id", route.id as string)
       .eq("driver_id", driverId);
 
-    const collectedBinIds = new Set((pickups ?? []).map((row) => row.bin_id as string));
+    let collectedBinIds = new Set((pickups ?? []).map((row) => row.bin_id as string));
+    const demoLoop = isDemoLoopRoute(route.name as string);
+
+    if (demoLoop && collectedBinIds.size >= orderedBins.length) {
+      await resetDemoRouteLap(supabase, route.id as string, driverId, binIds);
+      collectedBinIds = new Set();
+    }
 
     const { data: existing } = await supabase
       .from("driver_locations")
@@ -109,17 +123,57 @@ async function runSimulation(request: Request) {
     let position: DriverPosition;
     let collectedThisTick: string[] = [];
 
+    const current = existing
+      ? ({
+          latitude: existing.latitude as number,
+          longitude: existing.longitude as number,
+          updated_at: existing.updated_at as string,
+        } satisfies DriverPosition)
+      : null;
+
+    const { data: citizenPickup } = await supabase
+      .from("citizen_pickup_requests")
+      .select("id, latitude, longitude, status")
+      .eq("route_id", route.id as string)
+      .in("status", ["pending", "en_route", "arrived"])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
     if (anomalyDemo && updated % 2 === 0) {
       position = anomalyDemoPosition(orderedBins);
-    } else {
-      const current = existing
-        ? ({
-            latitude: existing.latitude as number,
-            longitude: existing.longitude as number,
-            updated_at: existing.updated_at as string,
-          } satisfies DriverPosition)
-        : null;
+    } else if (citizenPickup) {
+      if (citizenPickup.status === "arrived") {
+        position = current ?? {
+          latitude: citizenPickup.latitude as number,
+          longitude: citizenPickup.longitude as number,
+          updated_at: new Date().toISOString(),
+        };
+      } else {
+        const detour = simulateCitizenDetourTick(
+          current,
+          {
+            latitude: citizenPickup.latitude as number,
+            longitude: citizenPickup.longitude as number,
+          },
+          stepMeters,
+        );
 
+        position = detour.position;
+
+        if (detour.arrived) {
+          await supabase
+            .from("citizen_pickup_requests")
+            .update({ status: "arrived", arrived_at: new Date().toISOString() })
+            .eq("id", citizenPickup.id as string);
+        } else if (citizenPickup.status === "pending") {
+          await supabase
+            .from("citizen_pickup_requests")
+            .update({ status: "en_route" })
+            .eq("id", citizenPickup.id as string);
+        }
+      }
+    } else {
       const tick = simulateRouteTick({
         driverId,
         routeId: route.id as string,
@@ -157,7 +211,9 @@ async function runSimulation(request: Request) {
         binsCollected += 1;
       }
 
-      if (tick.routeComplete) {
+      if (tick.routeComplete && demoLoop) {
+        await resetDemoRouteLap(supabase, route.id as string, driverId, binIds);
+      } else if (tick.routeComplete) {
         await supabase.from("routes").update({ status: "completed" }).eq("id", route.id as string);
       }
     }
