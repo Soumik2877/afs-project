@@ -13,6 +13,7 @@
 .env
 .env.*
 !.env.example
+*.txt
 
 # misc
 *.log
