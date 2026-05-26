@@ -268,11 +268,11 @@ export default function LiveRouteMap({
                   "line-width": 4,
                   "line-opacity": 1,
                   "line-emissive-strength": 1,
+                  "line-dasharray": [2, 1.5],
                 }}
                 layout={{
                   "line-cap": "round",
                   "line-join": "round",
-                  "line-dasharray": [2, 1.5],
                 }}
               />
             </Source>
