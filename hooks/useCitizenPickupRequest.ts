@@ -9,7 +9,10 @@ import {
   formatEtaMinutes,
 } from "@/lib/citizen-pickup/eta";
 import { createClient } from "@/lib/supabase/client";
+import { useRealtimeChannelName } from "@/lib/supabase/realtime-channel";
 import type { CitizenPickupRequestRow, DriverLocationRow } from "@/types";
+
+export type CitizenPickupRequestState = ReturnType<typeof useCitizenPickupRequest>;
 
 export function useCitizenPickupRequest(
   citizenId: string | undefined,
@@ -17,9 +20,11 @@ export function useCitizenPickupRequest(
   driverLocation: DriverLocationRow | null,
 ) {
   const supabase = useMemo(() => createClient(), []);
+  const channelName = useRealtimeChannelName("citizen_pickup", citizenId ?? "none");
   const [request, setRequest] = useState<CitizenPickupRequestRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [tableMissing, setTableMissing] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!citizenId) {
@@ -28,7 +33,7 @@ export function useCitizenPickupRequest(
       return;
     }
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("citizen_pickup_requests")
       .select("*")
       .eq("citizen_id", citizenId)
@@ -36,6 +41,15 @@ export function useCitizenPickupRequest(
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
+
+    if (error?.code === "PGRST205") {
+      setTableMissing(true);
+      setRequest(null);
+      setLoading(false);
+      return;
+    }
+
+    setTableMissing(false);
 
     if (data && data.status === "completed") {
       const completedAt = new Date(data.completed_at ?? data.created_at).getTime();
@@ -56,10 +70,10 @@ export function useCitizenPickupRequest(
   }, [refresh, routeId]);
 
   useEffect(() => {
-    if (!citizenId) return;
+    if (!citizenId || tableMissing) return;
 
     const channel = supabase
-      .channel(`citizen-pickup-${citizenId}`)
+      .channel(channelName)
       .on(
         "postgres_changes",
         {
@@ -75,7 +89,7 @@ export function useCitizenPickupRequest(
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [citizenId, refresh, supabase]);
+  }, [channelName, citizenId, refresh, supabase, tableMissing]);
 
   const distanceMeters = useMemo(() => {
     if (!request || request.status === "completed") return null;
@@ -122,16 +136,31 @@ export function useCitizenPickupRequest(
     }
   }, [request]);
 
+  const cancelPickup = useCallback(async () => {
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/citizen-pickup/cancel", { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Cancel failed");
+      setRequest(null);
+      return json;
+    } finally {
+      setSubmitting(false);
+    }
+  }, []);
+
   return {
     request,
     loading,
     submitting,
+    tableMissing,
     distanceMeters,
     distanceLabel: formatDistanceMeters(distanceMeters),
     etaLabel: formatEtaMinutes(etaMinutes),
     etaMinutes,
     requestPickup,
     confirmPickup,
+    cancelPickup,
     refresh,
   };
 }

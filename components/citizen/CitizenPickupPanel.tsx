@@ -6,34 +6,25 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { useCitizenPickupRequest } from "@/hooks/useCitizenPickupRequest";
-import { useDriverLocationStream } from "@/hooks/useDriverLocationStream";
-import type { DriverLocationRow } from "@/types";
+import type { CitizenPickupRequestState } from "@/hooks/useCitizenPickupRequest";
 
 interface CitizenPickupPanelProps {
-  citizenId: string;
-  routeId: string;
-  driverId: string;
-  initialDriverLocation: DriverLocationRow | null;
+  pickup: CitizenPickupRequestState;
 }
 
-export function CitizenPickupPanel({
-  citizenId,
-  routeId,
-  driverId,
-  initialDriverLocation,
-}: CitizenPickupPanelProps) {
-  const driverLocation = useDriverLocationStream(driverId, initialDriverLocation);
+export function CitizenPickupPanel({ pickup }: CitizenPickupPanelProps) {
   const [geoLoading, setGeoLoading] = useState(false);
   const {
     request,
     loading,
     submitting,
+    tableMissing,
     distanceLabel,
     etaLabel,
     requestPickup,
     confirmPickup,
-  } = useCitizenPickupRequest(citizenId, routeId, driverLocation);
+    cancelPickup,
+  } = pickup;
 
   async function pinAt(latitude: number, longitude: number) {
     try {
@@ -75,9 +66,28 @@ export function CitizenPickupPanel({
   const hasArrived = request?.status === "arrived";
   const isCompleted = request?.status === "completed";
 
+  async function handleCancel() {
+    try {
+      await cancelPickup();
+      toast.success("Pickup cancelled — truck is returning to the Kalaikunda route.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not cancel pickup");
+    }
+  }
+
   return (
     <div className="space-y-4">
-      {!isActive && !isCompleted ? (
+      {tableMissing ? (
+        <p className="rounded-xl border border-amber-500/40 bg-amber-950/40 px-4 py-3 text-sm text-amber-100">
+          Citizen pickup is not set up yet. Run{" "}
+          <span className="font-mono">npm run db:migrate:citizen-pickup</span> (after adding{" "}
+          <span className="font-mono">DATABASE_URL</span> to <span className="font-mono">.env.local</span>
+          ), or paste <span className="font-mono">supabase/migrations/000002_citizen_pickup_requests.sql</span>{" "}
+          into the Supabase SQL Editor.
+        </p>
+      ) : null}
+
+      {!tableMissing && !isActive && !isCompleted ? (
         <div className="space-y-2">
           <Button
             type="button"
@@ -147,16 +157,27 @@ export function CitizenPickupPanel({
             </div>
           </div>
 
-          {hasArrived ? (
+          <div className="mt-4 flex flex-col gap-2">
+            {hasArrived ? (
+              <Button
+                type="button"
+                className="w-full bg-amber-500 font-semibold text-[#0f172a] hover:bg-amber-400"
+                disabled={submitting}
+                onClick={() => void confirmPickup()}
+              >
+                {submitting ? "Confirming…" : "Confirm pickup done"}
+              </Button>
+            ) : null}
             <Button
               type="button"
-              className="mt-4 w-full bg-amber-500 font-semibold text-[#0f172a] hover:bg-amber-400"
+              variant="outline"
+              className="w-full border-red-500/50 text-red-200 hover:bg-red-950/40 hover:text-red-100"
               disabled={submitting}
-              onClick={() => void confirmPickup()}
+              onClick={() => void handleCancel()}
             >
-              {submitting ? "Confirming…" : "Confirm pickup done"}
+              {submitting ? "Cancelling…" : "Cancel pickup — return truck to route"}
             </Button>
-          ) : null}
+          </div>
         </div>
       ) : null}
     </div>

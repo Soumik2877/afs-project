@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { createClient } from "@/lib/supabase/client";
+import { useRealtimeChannelName } from "@/lib/supabase/realtime-channel";
 import type { DriverLocationRow } from "@/types";
 
 const POLL_MS = Number(process.env.NEXT_PUBLIC_DRIVER_LOCATION_POLL_MS ?? 2000);
@@ -22,6 +23,7 @@ export function useDriverLocationStream(
 ) {
   const [location, setLocation] = useState<DriverLocationRow | null>(seed);
   const supabase = useMemo(() => createClient(), []);
+  const channelName = useRealtimeChannelName("driver_loc", driverId ?? "none");
 
   useEffect(() => {
     setLocation(seed);
@@ -47,9 +49,8 @@ export function useDriverLocationStream(
     void poll();
     const interval = setInterval(poll, POLL_MS);
 
-    const channel = supabase.channel(`driver_loc_${driverId}`);
-
-    channel
+    const channel = supabase
+      .channel(channelName)
       .on(
         "postgres_changes",
         {
@@ -72,7 +73,7 @@ export function useDriverLocationStream(
       clearInterval(interval);
       void supabase.removeChannel(channel);
     };
-  }, [driverId, supabase]);
+  }, [channelName, driverId, supabase]);
 
   return location;
 }

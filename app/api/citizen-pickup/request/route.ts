@@ -65,7 +65,12 @@ export async function POST(request: Request) {
     .single();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    const status = error.code === "PGRST205" ? 503 : 400;
+    const message =
+      error.code === "PGRST205"
+        ? "citizen_pickup_requests table is missing. Run migration 000002 in Supabase SQL Editor or npm run db:migrate:citizen-pickup."
+        : error.message;
+    return NextResponse.json({ error: message }, { status });
   }
 
   return NextResponse.json({ request: data });

@@ -86,8 +86,25 @@ export function buildRouteSegmentCollection(
   return { type: "FeatureCollection" as const, features };
 }
 
+/** Shared paint — v3 lighting needs emissive strength or lines render black/invisible. */
+const routeLineBase: LineLayerSpecification["paint"] = {
+  "line-width": 7,
+  "line-opacity": 1,
+  "line-emissive-strength": 1,
+};
+
+export const routeLinePaintCovered: LineLayerSpecification["paint"] = {
+  ...routeLineBase,
+  "line-color": ROUTE_ORANGE,
+};
+
+export const routeLinePaintAhead: LineLayerSpecification["paint"] = {
+  ...routeLineBase,
+  "line-color": ROUTE_GREEN,
+};
+
+/** @deprecated Use filtered covered/ahead layers instead */
 export const routeLinePaint: LineLayerSpecification["paint"] = {
   "line-color": ["case", ["boolean", ["get", "covered"], false], ROUTE_ORANGE, ROUTE_GREEN],
-  "line-width": 5,
-  "line-opacity": 0.95,
+  ...routeLineBase,
 };

@@ -7,6 +7,8 @@ import Link from "next/link";
 import { CitizenPickupPanel } from "@/components/citizen/CitizenPickupPanel";
 import { MapErrorBoundary } from "@/components/maps/MapErrorBoundary";
 import { Button } from "@/components/ui/button";
+import { useCitizenPickupRequest } from "@/hooks/useCitizenPickupRequest";
+import { useDriverLocationStream } from "@/hooks/useDriverLocationStream";
 import type { ActiveRouteTracking } from "@/lib/routes/active-route";
 
 const LiveRouteTracker = dynamic(
@@ -24,6 +26,13 @@ interface CitizenHomeProps {
 
 export function CitizenDashboard({ tracking, localityLabel, citizenId }: CitizenHomeProps) {
   const etaMinutes = tracking?.driverLocation ? 12 : undefined;
+  const driverId = tracking?.route.assigned_driver_id ?? null;
+  const driverLocation = useDriverLocationStream(driverId, tracking?.driverLocation ?? null);
+  const pickup = useCitizenPickupRequest(
+    citizenId ?? undefined,
+    tracking?.route.id,
+    driverLocation,
+  );
 
   return (
     <div className="space-y-10">
@@ -39,12 +48,7 @@ export function CitizenDashboard({ tracking, localityLabel, citizenId }: Citizen
         <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-start">
           {tracking && citizenId ? (
             <div className="flex-1">
-              <CitizenPickupPanel
-                citizenId={citizenId}
-                routeId={tracking.route.id}
-                driverId={tracking.route.assigned_driver_id!}
-                initialDriverLocation={tracking.driverLocation}
-              />
+              <CitizenPickupPanel pickup={pickup} />
             </div>
           ) : null}
           <Button variant="outline" className="px-12 py-6 text-lg uppercase tracking-[0.45em]" type="button" asChild>
@@ -58,12 +62,11 @@ export function CitizenDashboard({ tracking, localityLabel, citizenId }: Citizen
           <LiveRouteTracker
             bins={tracking.bins}
             binOrder={tracking.route.bin_ids}
-            driverId={tracking.route.assigned_driver_id!}
             routeId={tracking.route.id}
             driverName={tracking.driverName}
-            driverLocation={tracking.driverLocation}
+            driverLocation={driverLocation}
             collectedBinIds={tracking.collectedBinIds}
-            citizenId={citizenId ?? undefined}
+            citizenPickup={pickup.request}
           />
         </MapErrorBoundary>
       ) : (

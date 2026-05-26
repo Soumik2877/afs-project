@@ -31,3 +31,16 @@
     @apply min-h-screen bg-[#0A0F1E] font-sans text-[#F9FAFB] antialiased;
   }
 }
+
+/* Keep HTML markers above the WebGL canvas (Mapbox GL v3 stacking). */
+.mapboxgl-map {
+  position: relative;
+}
+
+.mapboxgl-canvas-container {
+  z-index: 0;
+}
+
+.mapboxgl-marker {
+  z-index: 2;
+}

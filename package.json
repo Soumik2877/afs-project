@@ -10,7 +10,8 @@
     "simulate:iot": "node scripts/iot-simulate-loop.mjs",
     "simulate:driver": "node scripts/driver-simulate-loop.mjs",
     "simulate:all": "node scripts/demo-simulate-loop.mjs",
-    "seed:demo-route": "node scripts/seed-demo-rectangle.mjs"
+    "seed:demo-route": "node scripts/seed-demo-rectangle.mjs",
+    "db:migrate:citizen-pickup": "node scripts/apply-citizen-pickup-migration.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
@@ -60,6 +61,7 @@
     "@types/react-dom": "^18",
     "eslint": "^8",
     "eslint-config-next": "14.2.35",
+    "pg": "^8.21.0",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
     "typescript": "^5"

@@ -5,27 +5,45 @@ import Map, { Layer, Marker, NavigationControl, Source, type MapRef } from "reac
 
 import { DriverRadarMarker } from "@/components/maps/DriverRadarMarker";
 import { cn } from "@/lib/utils";
-import { buildRouteSegmentCollection, routeLinePaint } from "@/lib/mapbox/route-segments";
-import { MAP_3D_VIEW, MAP_STYLE, withMap3DView } from "@/lib/mapbox/config";
-import { Map3DSetup } from "@/components/maps/Map3DSetup";
-import { useCitizenPickupRequest } from "@/hooks/useCitizenPickupRequest";
-import { useDriverLocationStream } from "@/hooks/useDriverLocationStream";
+import {
+  buildRouteSegmentCollection,
+  routeLinePaintAhead,
+  routeLinePaintCovered,
+} from "@/lib/mapbox/route-segments";
+import { MAP_STYLE } from "@/lib/mapbox/config";
 import { useRealtimeBins } from "@/hooks/useRealtimeBins";
 import { useSmoothMapPosition } from "@/hooks/useSmoothMapPosition";
-import type { BinRow, DriverLocationRow } from "@/types";
+import type { BinRow, CitizenPickupRequestRow, DriverLocationRow } from "@/types";
 
 const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
 interface LiveRouteMapProps {
   bins: BinRow[];
   binOrder: string[];
-  driverId: string;
   routeId: string;
   driverName?: string | null;
-  initialDriverLocation: DriverLocationRow | null;
+  driverLocation: DriverLocationRow | null;
   collectedBinIds?: string[];
-  citizenId?: string;
+  citizenPickup?: CitizenPickupRequestRow | null;
   heightClass?: string;
+}
+
+function parseCoord(lat: unknown, lng: unknown) {
+  const latitude = Number(lat);
+  const longitude = Number(lng);
+  if (
+    !Number.isFinite(latitude) ||
+    !Number.isFinite(longitude) ||
+    Math.abs(latitude) > 90 ||
+    Math.abs(longitude) > 180
+  ) {
+    return null;
+  }
+  return { lat: latitude, lng: longitude };
+}
+
+function binCoords(bin: BinRow) {
+  return parseCoord(bin.latitude, bin.longitude);
 }
 
 function binMarkerColor(bin: BinRow, collected: boolean, isNext: boolean) {
@@ -40,43 +58,36 @@ function binMarkerColor(bin: BinRow, collected: boolean, isNext: boolean) {
 export default function LiveRouteMap({
   bins,
   binOrder,
-  driverId,
   routeId,
   driverName,
-  initialDriverLocation,
+  driverLocation,
   collectedBinIds = [],
-  citizenId,
+  citizenPickup = null,
   heightClass = "h-[min(70vh,640px)]",
 }: LiveRouteMapProps) {
   const mapRef = useRef<MapRef | null>(null);
   const lastServerPingRef = useRef<string | null>(null);
+  const didFitBoundsRef = useRef(false);
   const collectedSet = useMemo(() => new Set(collectedBinIds), [collectedBinIds]);
 
   const { bins: liveBins } = useRealtimeBins(bins);
-  const driverLocation = useDriverLocationStream(driverId, initialDriverLocation);
 
-  const smoothTarget = useMemo(
-    () =>
-      driverLocation
-        ? { latitude: driverLocation.latitude, longitude: driverLocation.longitude }
-        : null,
-    [driverLocation],
-  );
+  const smoothTarget = useMemo(() => {
+    if (!driverLocation) return null;
+    const lat = Number(driverLocation.latitude);
+    const lng = Number(driverLocation.longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    return { latitude: lat, longitude: lng };
+  }, [driverLocation]);
 
   const smoothTruck = useSmoothMapPosition(smoothTarget, driverLocation?.updated_at);
-
-  const { request: citizenPickup } = useCitizenPickupRequest(
-    citizenId,
-    routeId,
-    driverLocation ?? initialDriverLocation,
-  );
 
   const citizenDetourLine = useMemo(() => {
     if (!citizenPickup || !["pending", "en_route", "arrived"].includes(citizenPickup.status)) {
       return null;
     }
 
-    const truck = smoothTruck ?? driverLocation ?? initialDriverLocation;
+    const truck = smoothTruck ?? driverLocation;
     const citizenCoord: [number, number] = [citizenPickup.longitude, citizenPickup.latitude];
 
     const coordinates: [number, number][] = truck
@@ -88,7 +99,7 @@ export default function LiveRouteMap({
       properties: {},
       geometry: { type: "LineString" as const, coordinates },
     };
-  }, [citizenPickup, smoothTruck, driverLocation, initialDriverLocation]);
+  }, [citizenPickup, smoothTruck, driverLocation]);
 
   const orderedBins = useMemo(() => {
     return [...liveBins].sort((a, b) => binOrder.indexOf(a.id) - binOrder.indexOf(b.id));
@@ -111,24 +122,78 @@ export default function LiveRouteMap({
   const initialView = useMemo(() => {
     const focus = smoothTruck ?? driverLocation ?? orderedBins[0];
     if (!focus) {
-      return { latitude: 12.9716, longitude: 77.5946, zoom: 12 };
+      return { latitude: 12.9716, longitude: 77.5946, zoom: 12, pitch: 0, bearing: 0 };
     }
-    return withMap3DView({
+    return {
       latitude: focus.latitude,
       longitude: focus.longitude,
-      zoom: MAP_3D_VIEW.zoom,
-    });
+      zoom: 15,
+      pitch: 0,
+      bearing: 0,
+    };
   }, [smoothTruck, driverLocation, orderedBins]);
 
   useEffect(() => {
-    if (!driverLocation || !mapRef.current) return;
+    const map = mapRef.current?.getMap();
+    if (!map || didFitBoundsRef.current || orderedBins.length === 0) return;
+
+    const fit = () => {
+      if (didFitBoundsRef.current) return;
+
+      let minLng = Infinity;
+      let minLat = Infinity;
+      let maxLng = -Infinity;
+      let maxLat = -Infinity;
+
+      for (const bin of orderedBins) {
+        const coord = binCoords(bin);
+        if (!coord) continue;
+        minLng = Math.min(minLng, coord.lng);
+        minLat = Math.min(minLat, coord.lat);
+        maxLng = Math.max(maxLng, coord.lng);
+        maxLat = Math.max(maxLat, coord.lat);
+      }
+
+      if (driverLocation) {
+        const lat = Number(driverLocation.latitude);
+        const lng = Number(driverLocation.longitude);
+        if (Number.isFinite(lat) && Number.isFinite(lng)) {
+          minLng = Math.min(minLng, lng);
+          minLat = Math.min(minLat, lat);
+          maxLng = Math.max(maxLng, lng);
+          maxLat = Math.max(maxLat, lat);
+        }
+      }
+
+      if (!Number.isFinite(minLng)) return;
+
+      didFitBoundsRef.current = true;
+      map.fitBounds(
+        [
+          [minLng, minLat],
+          [maxLng, maxLat],
+        ],
+        { padding: 72, duration: 800, maxZoom: 16 },
+      );
+    };
+
+    if (map.isStyleLoaded()) {
+      fit();
+    } else {
+      map.once("load", fit);
+    }
+  }, [driverLocation, orderedBins]);
+
+  useEffect(() => {
+    if (!driverLocation || !mapRef.current || !didFitBoundsRef.current) return;
     if (lastServerPingRef.current === driverLocation.updated_at) return;
 
     lastServerPingRef.current = driverLocation.updated_at;
     mapRef.current.easeTo({
       center: [driverLocation.longitude, driverLocation.latitude],
-      pitch: MAP_3D_VIEW.pitch,
-      bearing: MAP_3D_VIEW.bearing,
+      zoom: 15,
+      pitch: 0,
+      bearing: 0,
       duration: 1200,
       easing: (t) => t * (2 - t),
       essential: true,
@@ -165,23 +230,30 @@ export default function LiveRouteMap({
         </div>
       </div>
 
-      <div className={cn("overflow-hidden rounded-xl border border-[#1F2937]", heightClass)}>
+      <div className={cn("relative min-h-[320px] overflow-hidden rounded-xl border border-[#1F2937]", heightClass)}>
         <Map
           ref={mapRef}
           initialViewState={initialView}
           mapStyle={MAP_STYLE}
           mapboxAccessToken={token}
-          style={{ width: "100%", height: "100%" }}
+          style={{ width: "100%", height: "100%", minHeight: 320 }}
           renderWorldCopies={false}
         >
-          <NavigationControl position="top-right" visualizePitch />
-          <Map3DSetup />
+          <NavigationControl position="top-right" />
 
           <Source id={`route-line-${routeId}`} type="geojson" data={routeSegments}>
             <Layer
-              id={`route-line-layer-${routeId}`}
+              id={`route-line-covered-${routeId}`}
               type="line"
-              paint={routeLinePaint}
+              filter={["==", ["get", "covered"], true]}
+              paint={routeLinePaintCovered}
+              layout={{ "line-cap": "round", "line-join": "round" }}
+            />
+            <Layer
+              id={`route-line-ahead-${routeId}`}
+              type="line"
+              filter={["==", ["get", "covered"], false]}
+              paint={routeLinePaintAhead}
               layout={{ "line-cap": "round", "line-join": "round" }}
             />
           </Source>
@@ -193,30 +265,37 @@ export default function LiveRouteMap({
                 type="line"
                 paint={{
                   "line-color": "#38BDF8",
-                  "line-width": 3,
-                  "line-opacity": 0.85,
-                  "line-dasharray": [1.5, 1.2],
+                  "line-width": 4,
+                  "line-opacity": 1,
+                  "line-emissive-strength": 1,
                 }}
-                layout={{ "line-cap": "round", "line-join": "round" }}
+                layout={{
+                  "line-cap": "round",
+                  "line-join": "round",
+                  "line-dasharray": [2, 1.5],
+                }}
               />
             </Source>
           ) : null}
 
           {orderedBins.map((bin) => {
+            const coord = binCoords(bin);
+            if (!coord) return null;
+
             const collected =
               collectedSet.has(bin.id) || bin.status === "empty" || (bin.fill_level === 0 && bin.status !== "filling");
             const isNext = bin.id === nextBinId;
             const colors = binMarkerColor(bin, collected, isNext);
 
             return (
-              <Marker key={bin.id} latitude={bin.latitude} longitude={bin.longitude} anchor="bottom">
+              <Marker key={bin.id} latitude={coord.lat} longitude={coord.lng} anchor="bottom">
                 <div
                   className={cn(
-                    "flex h-9 w-9 items-center justify-center rounded-full border-2 border-white text-[10px] font-bold text-white shadow-[0_2px_12px_rgba(0,0,0,0.55)] transition-colors duration-500",
+                    "relative flex h-11 w-11 items-center justify-center rounded-full border-[3px] border-white text-[11px] font-bold text-white shadow-[0_0_0_2px_rgba(0,0,0,0.65),0_4px_14px_rgba(0,0,0,0.45)] transition-colors duration-500",
                     colors.ring,
-                    collected ? "opacity-60" : "",
+                    collected ? "opacity-80" : "",
                   )}
-                  style={{ backgroundColor: colors.bg }}
+                  style={{ backgroundColor: colors.bg, zIndex: 10 }}
                   title={bin.label}
                 >
                   {collected ? "✓" : bin.fill_level}
@@ -225,8 +304,14 @@ export default function LiveRouteMap({
             );
           })}
 
-          {citizenPickup && ["pending", "en_route", "arrived"].includes(citizenPickup.status) ? (
-            <Marker latitude={citizenPickup.latitude} longitude={citizenPickup.longitude} anchor="bottom">
+          {citizenPickup &&
+          ["pending", "en_route", "arrived"].includes(citizenPickup.status) &&
+          parseCoord(citizenPickup.latitude, citizenPickup.longitude) ? (
+            <Marker
+              latitude={Number(citizenPickup.latitude)}
+              longitude={Number(citizenPickup.longitude)}
+              anchor="bottom"
+            >
               <div
                 className={cn(
                   "flex flex-col items-center",
@@ -241,7 +326,7 @@ export default function LiveRouteMap({
             </Marker>
           ) : null}
 
-          {smoothTruck ? (
+          {smoothTruck && Number.isFinite(smoothTruck.latitude) && Number.isFinite(smoothTruck.longitude) ? (
             <Marker latitude={smoothTruck.latitude} longitude={smoothTruck.longitude} anchor="center">
               <DriverRadarMarker bearing={smoothTruck.bearing} isMoving={smoothTruck.isMoving} />
             </Marker>
